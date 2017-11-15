@@ -229,7 +229,15 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             for heads in self.headers:
                 headers[heads] = self.headers[heads]
 
-            conn.request(self.command, self.path)
+            headers['X-Forwarded-For'] = '' # X-Forwarded-For - The IP address of the client
+            headers['X-Forwarded-Host'] = '' # X-Forwarded-Host - The hostname used to access the site in the browser
+            headers['X-Forwarded-Proto'] = '' # X-Forwarded-Proto - The schema/protocol (http/https) used by the client
+            headers['X-Forwarded-Port'] = '' # X-Forwarded-Port - The port used by the client (typically 80 or 443)
+
+            # IMPORTANTE!!
+            print headers
+
+            conn.request(self.command, self.path, body, headers)
 
             response = conn.getresponse()
             self.send_response(response.status, response.reason)
@@ -281,7 +289,6 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         except Exception as e:
             print str(e)
             return False
-        # , , '', 
 
 
 
