@@ -475,7 +475,7 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
 if __name__ == "__main__":
 
 	httpd = BaseHTTPServer.HTTPServer(('', 8888), MyTCPHandler)
-	# httpd.socket = ssl.wrap_socket (httpd.socket, certfile='./server.pem', server_side=True)
+	httpd.socket = ssl.wrap_socket (httpd.socket, keyfile = "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", certfile = "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem", server_side = True)
 	httpd.serve_forever()
 
 
