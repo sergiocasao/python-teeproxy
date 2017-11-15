@@ -15,13 +15,14 @@ with catch_warnings():
                         DeprecationWarning)
 import mimetools
 import threading
-# import MySQLdb
+import MySQLdb
+import json
 
 # Connect
-# db = MySQLdb.connect(host="localhost",
-#                      user="root",
-#                      passwd="",
-#                      db="requestsSadok")
+db = MySQLdb.connect(host="localhost",
+                     user="root",
+                     passwd="",
+                     db="requestsSadok")
 
 # Default error message template
 DEFAULT_ERROR_MESSAGE = """\
@@ -219,8 +220,10 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             if 'Content-Length' in self.headers:
                 body = self.rfile.read(int(self.headers['Content-Length']))
             
-            conn = httplib.HTTPConnection("localhost", 8890)
-            # conn = httplib.HTTPSConnection("sergiocasao.com", 4433)
+            host_request = self.headers['host'].split(":")
+
+            conn = httplib.HTTPConnection(host_request[0], 8890)
+            # conn = httplib.HTTPSConnection(host_request[0], 4433)
 
             headers = {}
             for heads in self.headers:
@@ -251,6 +254,13 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         host, port = self.server.socket.getsockname()[:2]
         ts = time.time()
         timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        lenght = 0
+        if body is not None:
+            lenght = len(body)
+        headers = {}
+        for heads in self.headers:
+            headers[heads] = self.headers[heads]
+
         # print self.client_address
         # print self.command
         # print self.path
@@ -261,8 +271,19 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         # print host
         # print port
         # print timestamp
-        # x = db.cursor()
-        # x.execute ("INSERT INTO requests VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s') ", (self.client_address[0], self.client_address[1], host, port, self.command, self.path, self.protocol_version, self.headers, self.request_version, body, len(body), timestamp, timestamp))
+
+        x = db.cursor()
+        addRequest = "INSERT INTO requests (remote_address, remote_port, destination_address, destination_port, command, path, protocol_version, request_version, headers, body, bytes_transmited, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        try:
+            x.execute (addRequest, (self.client_address[0], self.client_address[1], host, port, self.command, self.path, self.protocol_version, self.request_version, json.dumps(headers), body, str(lenght), timestamp, timestamp))
+            db.commit()
+            return True
+        except Exception as e:
+            print str(e)
+            return False
+        # , , '', 
+
+
 
     def handle(self):
         """Handle multiple requests if necessary."""
