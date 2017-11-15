@@ -32,7 +32,6 @@ DEFAULT_ERROR_CONTENT_TYPE = "text/html"
 def _quote_html(html):
     return html.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-
 class MyTCPHandler(SocketServer.StreamRequestHandler):
 
     """HTTP request handler base class.
@@ -206,12 +205,10 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                 # An error code has been sent, just exit
                 return
             
-            print self.client_address
-            print self.protocol_version
-            print self.headers
-            print self.command
-            print self.path
-            print self.request_version
+            body = None
+
+            if 'Content-Length' in self.headers:
+                body = self.rfile.read(int(self.headers['Content-Length']))
             
             conn = httplib.HTTPSConnection("sergiocasao.com", 4433)
 
@@ -219,25 +216,24 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             for heads in self.headers:
                 headers[heads] = self.headers[heads]
 
-            # print self.headers
-            # print headers
-
-            body = None
-
-            if 'Content-Length' in self.headers:
-                body = self.rfile.read(int(self.headers['Content-Length']))
-
-            # print body
-
             conn.request(self.command, self.path)
 
             response = conn.getresponse()
-	    self.send_response(response.status, response.reason)
+            self.send_response(response.status, response.reason)
             for header in response.getheaders():
                 self.send_header(header[0], header[1])
             self.end_headers()
             self.wfile.write(response.read())
             self.wfile.flush() #actually send the response if not already done.
+
+            print self.client_address
+            print self.protocol_version
+            print self.headers
+            print self.command
+            print self.path
+            print self.request_version
+            print body
+
         except socket.timeout, e:
             #a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
