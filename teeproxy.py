@@ -120,70 +120,70 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
     default_request_version = "HTTP/0.9"
 
     def parse_request(self):
-        """Parse a request (internal).
-        The request should be stored in self.raw_requestline; the results
-        are in self.command, self.path, self.request_version and
-        self.headers.
-        Return True for success, False for failure; on failure, an
-        error is sent back.
-        """
-        self.command = None  # set in case of error on the first line
-        self.request_version = version = self.default_request_version
-        self.close_connection = 1
-        requestline = self.raw_requestline
-        requestline = requestline.rstrip('\r\n')
-        self.requestline = requestline
-        words = requestline.split()
-        if len(words) == 3:
-            command, path, version = words
-            if version[:5] != 'HTTP/':
-                self.send_error(400, "Bad request version (%r)" % version)
+            """Parse a request (internal).
+            The request should be stored in self.raw_requestline; the results
+            are in self.command, self.path, self.request_version and
+            self.headers.
+            Return True for success, False for failure; on failure, an
+            error is sent back.
+            """
+            self.command = None  # set in case of error on the first line
+            self.request_version = version = self.default_request_version
+            self.close_connection = 1
+            requestline = self.raw_requestline
+            requestline = requestline.rstrip('\r\n')
+            self.requestline = requestline
+            words = requestline.split()
+            if len(words) == 3:
+                command, path, version = words
+                if version[:5] != 'HTTP/':
+                    self.send_error(400, "Bad request version (%r)" % version)
+                    return False
+                try:
+                    base_version_number = version.split('/', 1)[1]
+                    version_number = base_version_number.split(".")
+                    # RFC 2145 section 3.1 says there can be only one "." and
+                    #   - major and minor numbers MUST be treated as
+                    #      separate integers;
+                    #   - HTTP/2.4 is a lower version than HTTP/2.13, which in
+                    #      turn is lower than HTTP/12.3;
+                    #   - Leading zeros MUST be ignored by recipients.
+                    if len(version_number) != 2:
+                        raise ValueError
+                    version_number = int(version_number[0]), int(version_number[1])
+                except (ValueError, IndexError):
+                    self.send_error(400, "Bad request version (%r)" % version)
+                    return False
+                if version_number >= (1, 1) and self.protocol_version >= "HTTP/1.1":
+                    self.close_connection = 0
+                if version_number >= (2, 0):
+                    self.send_error(505,
+                              "Invalid HTTP Version (%s)" % base_version_number)
+                    return False
+            elif len(words) == 2:
+                command, path = words
+                self.close_connection = 1
+                if command != 'GET':
+                    self.send_error(400,
+                                    "Bad HTTP/0.9 request type (%r)" % command)
+                    return False
+            elif not words:
                 return False
-            try:
-                base_version_number = version.split('/', 1)[1]
-                version_number = base_version_number.split(".")
-                # RFC 2145 section 3.1 says there can be only one "." and
-                #   - major and minor numbers MUST be treated as
-                #      separate integers;
-                #   - HTTP/2.4 is a lower version than HTTP/2.13, which in
-                #      turn is lower than HTTP/12.3;
-                #   - Leading zeros MUST be ignored by recipients.
-                if len(version_number) != 2:
-                    raise ValueError
-                version_number = int(version_number[0]), int(version_number[1])
-            except (ValueError, IndexError):
-                self.send_error(400, "Bad request version (%r)" % version)
+            else:
+                self.send_error(400, "Bad request syntax (%r)" % requestline)
                 return False
-            if version_number >= (1, 1) and self.protocol_version >= "HTTP/1.1":
+            self.command, self.path, self.request_version = command, path, version
+
+            # Examine the headers and look for a Connection directive
+            self.headers = self.MessageClass(self.rfile, 0)
+
+            conntype = self.headers.get('Connection', "")
+            if conntype.lower() == 'close':
+                self.close_connection = 1
+            elif (conntype.lower() == 'keep-alive' and
+                  self.protocol_version >= "HTTP/1.1"):
                 self.close_connection = 0
-            if version_number >= (2, 0):
-                self.send_error(505,
-                          "Invalid HTTP Version (%s)" % base_version_number)
-                return False
-        elif len(words) == 2:
-            command, path = words
-            self.close_connection = 1
-            if command != 'GET':
-                self.send_error(400,
-                                "Bad HTTP/0.9 request type (%r)" % command)
-                return False
-        elif not words:
-            return False
-        else:
-            self.send_error(400, "Bad request syntax (%r)" % requestline)
-            return False
-        self.command, self.path, self.request_version = command, path, version
-
-        # Examine the headers and look for a Connection directive
-        self.headers = self.MessageClass(self.rfile, 0)
-
-        conntype = self.headers.get('Connection', "")
-        if conntype.lower() == 'close':
-            self.close_connection = 1
-        elif (conntype.lower() == 'keep-alive' and
-              self.protocol_version >= "HTTP/1.1"):
-            self.close_connection = 0
-        return True
+            return True
 
     def handle_one_request(self):
         """Handle a single HTTP request.
@@ -205,25 +205,40 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             if not self.parse_request():
                 # An error code has been sent, just exit
                 return
-            print self.client_address
-            print self.protocol_version
+            
+            # print self.client_address
+            # print self.protocol_version
+            # print self.headers
+            # print self.command
+            # print self.path
+            # print self.request_version
+            
+            conn = httplib.HTTPConnection("localhost:8890")
+
+            headers = {}
+            for heads in self.headers:
+                headers[heads] = self.headers[heads]
+
             print self.headers
-            print self.command, self.path, self.request_version
-            print self.rfile
-            print self.request
-            # Doesn't do anything with posted data
-            content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
-            post_data = self.rfile.read(content_length)
-            print "-------"
-            print post_data
-            print "-------**"
-            # mname = 'do_' + self.command
-            # if not hasattr(self, mname):
-            #     self.send_error(501, "Unsupported method (%r)" % self.command)
-            #     return
-            # method = getattr(self, mname)
-            # method()
-            # self.wfile.flush() #actually send the response if not already done.
+            print headers
+
+            body = None
+
+            if 'Content-Length' in self.headers:
+                body = self.rfile.read(int(self.headers['Content-Length']))
+
+            print body
+
+            conn.request(self.command, self.path, body, headers)
+
+            response = conn.getresponse()
+            # print response.getheaders()
+            self.send_response(response.status, response.reason)
+            for header in response.getheaders():
+                self.send_header(header[0], header[1])
+            self.end_headers()
+            self.wfile.write(response.read())
+            self.wfile.flush() #actually send the response if not already done.
         except socket.timeout, e:
             #a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
@@ -284,8 +299,8 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             self.wfile.write("%s %d %s\r\n" %
                              (self.protocol_version, code, message))
             # print (self.protocol_version, code, message)
-        self.send_header('Server', self.version_string())
-        self.send_header('Date', self.date_time_string())
+        # self.send_header('Server', self.version_string())
+        # self.send_header('Date', self.date_time_string())
 
     def send_header(self, keyword, value):
         """Send a MIME header."""
