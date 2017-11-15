@@ -206,34 +206,33 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                 # An error code has been sent, just exit
                 return
             
-            # print self.client_address
-            # print self.protocol_version
-            # print self.headers
-            # print self.command
-            # print self.path
-            # print self.request_version
+            print self.client_address
+            print self.protocol_version
+            print self.headers
+            print self.command
+            print self.path
+            print self.request_version
             
-            conn = httplib.HTTPSConnection("localhost", 4443, "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem")
+            conn = httplib.HTTPSConnection("sergiocasao.com", 4433)
 
             headers = {}
             for heads in self.headers:
                 headers[heads] = self.headers[heads]
 
-            print self.headers
-            print headers
+            # print self.headers
+            # print headers
 
             body = None
 
             if 'Content-Length' in self.headers:
                 body = self.rfile.read(int(self.headers['Content-Length']))
 
-            print body
+            # print body
 
-            conn.request(self.command, self.path, body, headers)
+            conn.request(self.command, self.path)
 
             response = conn.getresponse()
-            # print response.getheaders()
-            self.send_response(response.status, response.reason)
+	    self.send_response(response.status, response.reason)
             for header in response.getheaders():
                 self.send_header(header[0], header[1])
             self.end_headers()
