@@ -7,12 +7,21 @@ import SocketServer
 import sys
 import socket # For gethostbyaddr()
 import time
+import datetime
 from warnings import filterwarnings, catch_warnings
 with catch_warnings():
     if sys.py3kwarning:
         filterwarnings("ignore", ".*mimetools has been removed",
                         DeprecationWarning)
 import mimetools
+import threading
+# import MySQLdb
+
+# Connect
+# db = MySQLdb.connect(host="localhost",
+#                      user="root",
+#                      passwd="",
+#                      db="requestsSadok")
 
 # Default error message template
 DEFAULT_ERROR_MESSAGE = """\
@@ -210,7 +219,8 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             if 'Content-Length' in self.headers:
                 body = self.rfile.read(int(self.headers['Content-Length']))
             
-            conn = httplib.HTTPSConnection("sergiocasao.com", 4433)
+            conn = httplib.HTTPConnection("localhost", 8890)
+            # conn = httplib.HTTPSConnection("sergiocasao.com", 4433)
 
             headers = {}
             for heads in self.headers:
@@ -225,20 +235,34 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             self.end_headers()
             self.wfile.write(response.read())
             self.wfile.flush() #actually send the response if not already done.
-
-            print self.client_address
-            print self.protocol_version
-            print self.headers
-            print self.command
-            print self.path
-            print self.request_version
-            print body
+            self.thread(body)
 
         except socket.timeout, e:
             #a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
             self.close_connection = 1
             return
+
+    def thread(self, body):
+        t = threading.Thread(target=self.threading_function, args=(body,))
+        t.start()
+
+    def threading_function(self, body):
+        host, port = self.server.socket.getsockname()[:2]
+        ts = time.time()
+        timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        # print self.client_address
+        # print self.command
+        # print self.path
+        # print self.protocol_version
+        # print self.headers
+        # print self.request_version
+        # print body
+        # print host
+        # print port
+        # print timestamp
+        # x = db.cursor()
+        # x.execute ("INSERT INTO requests VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s') ", (self.client_address[0], self.client_address[1], host, port, self.command, self.path, self.protocol_version, self.headers, self.request_version, body, len(body), timestamp, timestamp))
 
     def handle(self):
         """Handle multiple requests if necessary."""
@@ -284,7 +308,6 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         Also send two standard headers with the server software
         version and the current date.
         """
-        self.log_request(code)
         if message is None:
             if code in self.responses:
                 message = self.responses[code][0]
@@ -293,9 +316,6 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         if self.request_version != 'HTTP/0.9':
             self.wfile.write("%s %d %s\r\n" %
                              (self.protocol_version, code, message))
-            # print (self.protocol_version, code, message)
-        # self.send_header('Server', self.version_string())
-        # self.send_header('Date', self.date_time_string())
 
     def send_header(self, keyword, value):
         """Send a MIME header."""
@@ -312,14 +332,6 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         """Send the blank line ending the MIME headers."""
         if self.request_version != 'HTTP/0.9':
             self.wfile.write("\r\n")
-
-    def log_request(self, code='-', size='-'):
-        """Log an accepted request.
-        This is called by send_response().
-        """
-
-        self.log_message('"%s" %s %s',
-                         self.requestline, str(code), str(size))
 
     def log_error(self, format, *args):
         """Log an error.
@@ -348,10 +360,6 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                          (self.address_string(),
                           self.log_date_time_string(),
                           format%args))
-
-    def version_string(self):
-        """Return the server software version string."""
-        return self.server_version + ' ' + self.sys_version
 
     def date_time_string(self, timestamp=None):
         """Return the current date and time formatted for a message header."""
@@ -469,8 +477,8 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
 
 if __name__ == "__main__":
 
-	httpd = BaseHTTPServer.HTTPServer(('', 443), MyTCPHandler)
-	httpd.socket = ssl.wrap_socket (httpd.socket, keyfile = "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", certfile = "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem", server_side = True)
+	httpd = BaseHTTPServer.HTTPServer(('', 8888), MyTCPHandler)
+	# httpd.socket = ssl.wrap_socket (httpd.socket, keyfile = "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", certfile = "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem", server_side = True)
 	httpd.serve_forever()
 
 
