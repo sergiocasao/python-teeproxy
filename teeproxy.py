@@ -213,7 +213,7 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             # print self.path
             # print self.request_version
             
-            conn = httplib.HTTPConnection("localhost:8890")
+            conn = httplib.HTTPSConnection("localhost", 4443, "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem")
 
             headers = {}
             for heads in self.headers:
@@ -474,7 +474,7 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
 
 if __name__ == "__main__":
 
-	httpd = BaseHTTPServer.HTTPServer(('', 8888), MyTCPHandler)
+	httpd = BaseHTTPServer.HTTPServer(('', 443), MyTCPHandler)
 	httpd.socket = ssl.wrap_socket (httpd.socket, keyfile = "/etc/letsencrypt/live/sergiocasao.com/privkey.pem", certfile = "/etc/letsencrypt/live/sergiocasao.com/fullchain.pem", server_side = True)
 	httpd.serve_forever()
 
